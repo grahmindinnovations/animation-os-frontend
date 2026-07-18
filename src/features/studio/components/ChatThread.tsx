@@ -10,10 +10,11 @@ interface ChatThreadProps {
   story?: StoryTree;
   character?: Character;
   world?: World;
+  isBusy?: boolean;
   latestRender?: RenderHistory;
 }
 
-export function ChatThread({ messages, story, character, world, latestRender }: ChatThreadProps) {
+export function ChatThread({ messages, story, character, world, isBusy, latestRender }: ChatThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function ChatThread({ messages, story, character, world, latestRender }: 
         />
       )}
 
-      {story && !latestRender && (
+      {isBusy && story && !latestRender && (
         <p className="text-center text-xs text-[var(--color-muted-foreground)]">
           Building your video…
           {character ? ` · ${character.name}` : ""}

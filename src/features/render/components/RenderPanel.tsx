@@ -1,4 +1,3 @@
-import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Film, Loader2, Play } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -6,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchJob, isJobFinished } from "@/features/jobs/api/jobsApi";
 import { fetchProduction } from "@/features/production/api/productionApi";
-import { fetchLatestRender, renderEpisode } from "@/features/render/api/renderApi";
+import { fetchLatestRenderOptional, renderEpisode } from "@/features/render/api/renderApi";
 import { getErrorMessage } from "@/lib/api";
 import { storageUrl } from "@/lib/storage";
 import type { RenderHistory, StoryTree } from "@/types";
@@ -29,12 +28,8 @@ export function RenderPanel({ projectId, story }: RenderPanelProps) {
 
   const { data: latestRender } = useQuery({
     queryKey: ["render", projectId, "latest"],
-    queryFn: () => fetchLatestRender(projectId),
+    queryFn: () => fetchLatestRenderOptional(projectId),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
   const { data: job } = useQuery({

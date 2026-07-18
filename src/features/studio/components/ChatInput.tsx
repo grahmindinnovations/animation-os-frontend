@@ -1,10 +1,11 @@
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Square } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
+  onStop?: () => void;
   disabled?: boolean;
   isBusy?: boolean;
   placeholder?: string;
@@ -13,6 +14,7 @@ interface ChatInputProps {
 
 export function ChatInput({
   onSend,
+  onStop,
   disabled,
   isBusy,
   placeholder = 'Try "Change hair to blonde", "Change shirt to red", or "Export MP4"',
@@ -22,7 +24,7 @@ export function ChatInput({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!value.trim()) return;
+    if (!value.trim() || isBusy) return;
     onSend(value);
     setValue("");
   };
@@ -45,10 +47,23 @@ export function ChatInput({
             }}
             className="min-h-[52px] flex-1 resize-none rounded-xl border border-white/10 bg-[var(--color-secondary)] px-4 py-3 text-sm text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] disabled:opacity-50"
           />
-          <Button type="submit" size="lg" className="shrink-0 gap-2 px-5" disabled={disabled || isBusy || !value.trim()}>
-            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {submitLabel}
-          </Button>
+          {isBusy && onStop ? (
+            <Button
+              type="button"
+              size="lg"
+              variant="destructive"
+              className="shrink-0 gap-2 px-5"
+              onClick={onStop}
+            >
+              <Square className="h-4 w-4 fill-current" />
+              Stop
+            </Button>
+          ) : (
+            <Button type="submit" size="lg" className="shrink-0 gap-2 px-5" disabled={disabled || isBusy || !value.trim()}>
+              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submitLabel}
+            </Button>
+          )}
         </div>
       </div>
     </form>

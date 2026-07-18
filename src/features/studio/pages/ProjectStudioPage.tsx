@@ -1,12 +1,11 @@
-import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { Loading } from "@/components/common/Loading";
-import { fetchCharacter } from "@/features/character/api/characterApi";
+import { fetchCharacterOptional } from "@/features/character/api/characterApi";
 import { fetchProject } from "@/features/projects/api/projectsApi";
-import { fetchLatestRender, fetchRenders } from "@/features/render/api/renderApi";
+import { fetchLatestRenderOptional, fetchRenders } from "@/features/render/api/renderApi";
 import { ChannelPanel } from "@/features/studio/components/ChannelPanel";
 import { ChatInput } from "@/features/studio/components/ChatInput";
 import { ChatThread } from "@/features/studio/components/ChatThread";
@@ -21,8 +20,8 @@ import {
   loadActiveVideoSession,
   saveActiveVideoSession,
 } from "@/features/studio/utils/videoSessionStorage";
-import { fetchStory } from "@/features/story/api/storyApi";
-import { fetchWorld } from "@/features/world/api/worldApi";
+import { fetchStoryOptional } from "@/features/story/api/storyApi";
+import { fetchWorldOptional } from "@/features/world/api/worldApi";
 import { useLayoutStore } from "@/stores/layoutStore";
 import type { RenderHistory } from "@/types";
 
@@ -46,62 +45,48 @@ export function ProjectStudioPage() {
     enabled: Boolean(projectId),
   });
 
-  const { data: story } = useQuery({
+  const { data: storyData } = useQuery({
     queryKey: ["story", projectId],
-    queryFn: () => fetchStory(projectId!),
+    queryFn: () => fetchStoryOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
-  const { data: character } = useQuery({
+  const { data: characterData } = useQuery({
     queryKey: ["character", projectId],
-    queryFn: () => fetchCharacter(projectId!),
+    queryFn: () => fetchCharacterOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
-  const { data: world } = useQuery({
+  const { data: worldData } = useQuery({
     queryKey: ["world", projectId],
-    queryFn: () => fetchWorld(projectId!),
+    queryFn: () => fetchWorldOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
-  const { data: latestRender } = useQuery({
-    queryKey: ["render", projectId, "latest"],
-    queryFn: () => fetchLatestRender(projectId!),
-    enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
-  });
+  const story = storyData ?? undefined;
+  const character = characterData ?? undefined;
+  const world = worldData ?? undefined;
 
-  const { data: allRenders = [] } = useQuery({
-    queryKey: ["render", projectId, "all"],
-    queryFn: () => fetchRenders(projectId!),
-    enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
-  });
-
-  const { messages, sendMessage, isBusy } = useProjectChat({
+  const { messages, sendMessage, stopGeneration, isBusy } = useProjectChat({
     projectId: projectId!,
     projectName: project?.name,
     videoSessionId,
     story,
     character,
+  });
+
+  const { data: latestRenderData } = useQuery({
+    queryKey: ["render", projectId, "latest"],
+    queryFn: () => fetchLatestRenderOptional(projectId!),
+    enabled: Boolean(projectId) && !isBusy,
+  });
+
+  const latestRender = latestRenderData ?? undefined;
+
+  const { data: allRenders = [] } = useQuery({
+    queryKey: ["render", projectId, "all"],
+    queryFn: () => fetchRenders(projectId!),
+    enabled: Boolean(projectId),
   });
 
   const displayRender = useMemo(() => {
@@ -162,7 +147,7 @@ export function ProjectStudioPage() {
         )}
 
         <div ref={chatScrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          {isEmptyStudio && <StudioEmptyState onSend={sendMessage} isBusy={isBusy} />}
+          {isEmptyStudio && <StudioEmptyState onSend={sendMessage} onStop={stopGeneration} isBusy={isBusy} />}
 
           {!isEmptyStudio && centerMode === "chat" && (
             <div className="mx-auto w-full max-w-3xl px-4">
@@ -171,6 +156,7 @@ export function ProjectStudioPage() {
                 story={story}
                 character={character}
                 world={world}
+                isBusy={isBusy}
                 latestRender={isDraftSession ? displayRender : undefined}
               />
             </div>
@@ -203,7 +189,7 @@ export function ProjectStudioPage() {
 
         {!isEmptyStudio && centerMode === "chat" && (
           <div className="mx-auto w-full max-w-3xl shrink-0">
-            <ChatInput onSend={sendMessage} isBusy={isBusy} />
+            <ChatInput onSend={sendMessage} onStop={stopGeneration} isBusy={isBusy} />
           </div>
         )}
       </div>

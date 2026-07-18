@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { ChevronLeft, ChevronRight, Plus, Radio, Video } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,10 +37,6 @@ export function ChannelPanel({
     queryKey: ["render", projectId, "all"],
     queryFn: () => fetchRenders(projectId),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
   if (collapsed) {

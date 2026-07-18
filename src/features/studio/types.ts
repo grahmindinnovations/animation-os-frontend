@@ -14,6 +14,7 @@ export interface ChatMessage {
   timestamp: number;
   steps?: ChatStep[];
   anchor?: ChatAnchor;
+  jobId?: string;
 }
 
 export type StudioSection = ChatAnchor;

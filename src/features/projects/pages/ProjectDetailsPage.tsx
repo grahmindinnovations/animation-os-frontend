@@ -1,4 +1,3 @@
-import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -9,16 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteProject, fetchProject, updateProject } from "@/features/projects/api/projectsApi";
-import { fetchCharacter } from "@/features/character/api/characterApi";
+import { fetchCharacterOptional } from "@/features/character/api/characterApi";
 import { CharacterPanel } from "@/features/character/components/CharacterPanel";
-import { fetchWorld } from "@/features/world/api/worldApi";
+import { fetchWorldOptional } from "@/features/world/api/worldApi";
 import { WorldPanel } from "@/features/world/components/WorldPanel";
-import { fetchStory } from "@/features/story/api/storyApi";
+import { fetchStoryOptional } from "@/features/story/api/storyApi";
 import { StoryOutline } from "@/features/story/components/StoryOutline";
 import { ProductionPanel } from "@/features/production/components/ProductionPanel";
 import { MemoryPanel } from "@/features/memory/components/MemoryPanel";
 import { SelectiveRenderPanel } from "@/features/selective-render/components/SelectiveRenderPanel";
-import { fetchLatestRender } from "@/features/render/api/renderApi";
+import { fetchLatestRenderOptional } from "@/features/render/api/renderApi";
 import { EpisodePreview, RenderPanel } from "@/features/render/components/RenderPanel";
 import { getErrorMessage } from "@/lib/api";
 import type { Project } from "@/types";
@@ -35,45 +34,34 @@ export function ProjectDetailsPage() {
     enabled: Boolean(projectId),
   });
 
-  const { data: story } = useQuery({
+  const { data: storyData } = useQuery({
     queryKey: ["story", projectId],
-    queryFn: () => fetchStory(projectId!),
+    queryFn: () => fetchStoryOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
-  const { data: character } = useQuery({
+  const { data: characterData } = useQuery({
     queryKey: ["character", projectId],
-    queryFn: () => fetchCharacter(projectId!),
+    queryFn: () => fetchCharacterOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
-  const { data: world } = useQuery({
+  const { data: worldData } = useQuery({
     queryKey: ["world", projectId],
-    queryFn: () => fetchWorld(projectId!),
+    queryFn: () => fetchWorldOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
 
-  const { data: latestRender } = useQuery({
+  const { data: latestRenderData } = useQuery({
     queryKey: ["render", projectId, "latest"],
-    queryFn: () => fetchLatestRender(projectId!),
+    queryFn: () => fetchLatestRenderOptional(projectId!),
     enabled: Boolean(projectId),
-    retry: (failureCount, error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
-      return failureCount < 2;
-    },
   });
+
+  const story = storyData ?? undefined;
+  const character = characterData ?? undefined;
+  const world = worldData ?? undefined;
+  const latestRender = latestRenderData ?? undefined;
 
   const [form, setForm] = useState<Pick<Project, "name" | "description" | "status"> | null>(null);
   const current = form ?? project;

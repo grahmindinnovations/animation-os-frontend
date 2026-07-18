@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getOptional } from "@/lib/api";
 import type { Job, RenderHistory } from "@/types";
 
 export async function renderEpisode(projectId: string, episodeId?: string): Promise<Job> {
@@ -11,6 +11,10 @@ export async function renderEpisode(projectId: string, episodeId?: string): Prom
 export async function fetchLatestRender(projectId: string): Promise<RenderHistory> {
   const { data } = await api.get<RenderHistory>(`/projects/${projectId}/render/latest`);
   return data;
+}
+
+export async function fetchLatestRenderOptional(projectId: string): Promise<RenderHistory | null> {
+  return getOptional<RenderHistory>(`/projects/${projectId}/render/latest`);
 }
 
 export async function fetchRenders(projectId: string): Promise<RenderHistory[]> {

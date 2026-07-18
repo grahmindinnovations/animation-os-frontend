@@ -83,3 +83,14 @@ export function getErrorMessage(error: unknown): string {
   }
   return "Something went wrong. Please try again.";
 }
+
+/** GET that returns null on 404 instead of throwing — for resources not created yet. */
+export async function getOptional<T>(url: string): Promise<T | null> {
+  const response = await api.get<T>(url, {
+    validateStatus: (status) => status === 200 || status === 404,
+  });
+  if (response.status === 404) {
+    return null;
+  }
+  return response.data;
+}

@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getOptional } from "@/lib/api";
 import type { Job, StoryTree } from "@/types";
 
 export async function generateStory(projectId: string, prompt: string): Promise<Job> {
@@ -9,4 +9,8 @@ export async function generateStory(projectId: string, prompt: string): Promise<
 export async function fetchStory(projectId: string): Promise<StoryTree> {
   const { data } = await api.get<StoryTree>(`/projects/${projectId}/story`);
   return data;
+}
+
+export async function fetchStoryOptional(projectId: string): Promise<StoryTree | null> {
+  return getOptional<StoryTree>(`/projects/${projectId}/story`);
 }

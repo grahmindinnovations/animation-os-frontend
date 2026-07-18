@@ -11,10 +11,11 @@ const SUGGESTIONS = [
 
 interface StudioEmptyStateProps {
   onSend: (text: string) => void;
+  onStop?: () => void;
   isBusy?: boolean;
 }
 
-export function StudioEmptyState({ onSend, isBusy }: StudioEmptyStateProps) {
+export function StudioEmptyState({ onSend, onStop, isBusy }: StudioEmptyStateProps) {
   const [value, setValue] = useState("");
 
   const submit = (text: string) => {
@@ -51,10 +52,16 @@ export function StudioEmptyState({ onSend, isBusy }: StudioEmptyStateProps) {
           />
           <div className="flex items-center justify-between border-t border-white/10 bg-[var(--color-secondary)]/50 px-4 py-3">
             <span className="text-[11px] text-[var(--color-muted-foreground)]">16:9 · Full episode</span>
-            <Button type="submit" disabled={isBusy || !value.trim()} className="gap-2">
-              <Wand2 className="h-4 w-4" />
-              Generate
-            </Button>
+            {isBusy && onStop ? (
+              <Button type="button" variant="destructive" className="gap-2" onClick={onStop}>
+                Stop
+              </Button>
+            ) : (
+              <Button type="submit" disabled={isBusy || !value.trim()} className="gap-2">
+                <Wand2 className="h-4 w-4" />
+                Generate
+              </Button>
+            )}
           </div>
         </div>
       </form>

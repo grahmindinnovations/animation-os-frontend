@@ -11,6 +11,11 @@ export async function fetchJob(jobId: string): Promise<Job> {
   return data;
 }
 
+export async function cancelJob(jobId: string): Promise<Job> {
+  const { data } = await api.post<Job>(`/jobs/${jobId}/cancel`);
+  return data;
+}
+
 export function isJobFinished(job: Job): boolean {
-  return job.status === "completed" || job.status === "failed";
+  return job.status === "completed" || job.status === "failed" || job.status === "cancelled";
 }

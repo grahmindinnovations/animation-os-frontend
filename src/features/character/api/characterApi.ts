@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getOptional } from "@/lib/api";
 import type { Character, Job } from "@/types";
 
 export async function generateCharacter(projectId: string, prompt: string): Promise<Job> {
@@ -9,4 +9,8 @@ export async function generateCharacter(projectId: string, prompt: string): Prom
 export async function fetchCharacter(projectId: string): Promise<Character> {
   const { data } = await api.get<Character>(`/projects/${projectId}/character`);
   return data;
+}
+
+export async function fetchCharacterOptional(projectId: string): Promise<Character | null> {
+  return getOptional<Character>(`/projects/${projectId}/character`);
 }

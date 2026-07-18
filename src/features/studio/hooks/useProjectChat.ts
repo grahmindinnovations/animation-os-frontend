@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchJob } from "@/features/jobs/api/jobsApi";
+import { cancelJob, fetchJob } from "@/features/jobs/api/jobsApi";
 import { updateProject } from "@/features/projects/api/projectsApi";
 import { generatePipeline, getPipelineSteps } from "@/features/studio/api/pipelineApi";
 import { waitForJob } from "@/features/studio/hooks/useWaitForJob";
@@ -14,10 +14,15 @@ import {
   type AppearanceField,
 } from "@/features/studio/utils/chatIntents";
 import { loadChatMessages, saveChatMessages } from "@/features/studio/utils/chatStorage";
+import { sanitizeStaleRunningMessages, stoppedProgressMessage } from "@/features/studio/utils/chatMessageUtils";
 import { renderEpisode } from "@/features/render/api/renderApi";
 import { patchCharacterAppearanceSelective } from "@/features/selective-render/api/selectiveRenderApi";
-import { fetchStory } from "@/features/story/api/storyApi";
+import { fetchStoryOptional } from "@/features/story/api/storyApi";
 import { getErrorMessage } from "@/lib/api";
+import {
+  formatPipelineFailureMessage,
+  logPipelineFailure,
+} from "@/features/studio/utils/formatPipelineError";
 import type { Character, StoryTree } from "@/types";
 
 function newId(): string {
@@ -48,13 +53,26 @@ interface UseProjectChatOptions {
   character?: Character;
 }
 
+interface ActiveGeneration {
+  sessionKey: string;
+  jobId: string;
+  progressMessageId: string;
+  aborted: boolean;
+}
+
 export function useProjectChat({ projectId, projectName, videoSessionId, story, character }: UseProjectChatOptions) {
   const queryClient = useQueryClient();
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadChatMessages(projectId, videoSessionId));
+  const sessionKey = `${projectId}:${videoSessionId}`;
+  const activeGenerationRef = useRef<ActiveGeneration | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    sanitizeStaleRunningMessages(loadChatMessages(projectId, videoSessionId)),
+  );
   const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
-    setMessages(loadChatMessages(projectId, videoSessionId));
+    activeGenerationRef.current = null;
+    setIsBusy(false);
+    setMessages(sanitizeStaleRunningMessages(loadChatMessages(projectId, videoSessionId)));
   }, [projectId, videoSessionId]);
 
   useEffect(() => {
@@ -70,14 +88,19 @@ export function useProjectChat({ projectId, projectName, videoSessionId, story, 
   }, []);
 
   const pollPipelineJob = useCallback(
-    async (jobId: string, progressMessageId: string) => {
+    async (jobId: string, progressMessageId: string, pollSessionKey: string) => {
       for (;;) {
+        const active = activeGenerationRef.current;
+        if (!active || active.aborted || active.sessionKey !== pollSessionKey) {
+          return null;
+        }
+
         const job = await fetchJob(jobId);
         const steps = toChatSteps(getPipelineSteps(job));
-        if (steps) {
+        if (steps && active.sessionKey === pollSessionKey) {
           updateMessage(progressMessageId, { steps });
         }
-        if (job.status === "completed" || job.status === "failed") {
+        if (job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
           return job;
         }
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -85,6 +108,35 @@ export function useProjectChat({ projectId, projectName, videoSessionId, story, 
     },
     [updateMessage],
   );
+
+  const stopGeneration = useCallback(async () => {
+    const active = activeGenerationRef.current;
+    if (!active) return;
+
+    active.aborted = true;
+    setIsBusy(false);
+
+    try {
+      await cancelJob(active.jobId);
+    } catch (err) {
+      console.error("[Animation OS] Cancel request failed", err);
+    }
+
+    updateMessage(active.progressMessageId, {
+      ...stoppedProgressMessage("Generation stopped.", undefined),
+    });
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === active.progressMessageId
+          ? {
+              ...message,
+              ...stoppedProgressMessage("Generation stopped.", message.steps),
+            }
+          : message,
+      ),
+    );
+    activeGenerationRef.current = null;
+  }, [updateMessage]);
 
   const invalidateProjectData = useCallback(async () => {
     await Promise.all([
@@ -130,32 +182,72 @@ export function useProjectChat({ projectId, projectName, videoSessionId, story, 
 
       try {
         const created = await generatePipeline(projectId, prompt);
-        const job = await pollPipelineJob(created.id, progress.id);
+        updateMessage(progress.id, { jobId: created.id });
+        activeGenerationRef.current = {
+          sessionKey,
+          jobId: created.id,
+          progressMessageId: progress.id,
+          aborted: false,
+        };
+
+        const job = await pollPipelineJob(created.id, progress.id, sessionKey);
+        if (!job) {
+          return;
+        }
+
         await invalidateProjectData();
+        activeGenerationRef.current = null;
+
+        if (job.status === "cancelled") {
+          updateMessage(progress.id, stoppedProgressMessage("Generation stopped.", toChatSteps(getPipelineSteps(job))));
+          return;
+        }
 
         if (job.status === "failed") {
+          logPipelineFailure(job);
+          const failedSteps = toChatSteps(getPipelineSteps(job));
           updateMessage(progress.id, {
-            content: `Something went wrong: ${job.error ?? "Pipeline failed"}`,
+            content: formatPipelineFailureMessage(job),
+            steps: failedSteps ?? undefined,
           });
           return;
         }
 
+        const sceneCount = typeof job.result?.scene_count === "number" ? job.result.scene_count : 1;
+        const duration =
+          typeof job.result?.duration_seconds === "number"
+            ? job.result.duration_seconds.toFixed(0)
+            : null;
+        const durationText = duration ? ` (${duration}s, ${sceneCount} scene${sceneCount === 1 ? "" : "s"})` : "";
+
         appendMessage(
           assistantMessage(
-            "Your video is ready. Same character and world across the full story — edit anything and only that part changes.",
+            `Your video is ready${durationText}. Same character and world across every scene — edit anything and only that part changes.`,
             undefined,
             "export",
           ),
         );
       } catch (err) {
+        console.error("[Animation OS] Pipeline request failed", err);
         updateMessage(progress.id, {
-          content: `Something went wrong: ${getErrorMessage(err)}`,
+          content: `Request failed before pipeline started.\n\n${getErrorMessage(err)}`,
         });
       } finally {
+        if (activeGenerationRef.current?.progressMessageId === progress.id) {
+          activeGenerationRef.current = null;
+        }
         setIsBusy(false);
       }
     },
-    [appendMessage, invalidateProjectData, maybeRenameProject, pollPipelineJob, projectId, updateMessage],
+    [
+      appendMessage,
+      invalidateProjectData,
+      maybeRenameProject,
+      pollPipelineJob,
+      projectId,
+      sessionKey,
+      updateMessage,
+    ],
   );
 
   const runAppearanceEdit = useCallback(
@@ -196,7 +288,10 @@ export function useProjectChat({ projectId, projectName, videoSessionId, story, 
         await queryClient.invalidateQueries({ queryKey: ["shots", projectId] });
 
         updateStep(2, "running");
-        const freshStory = story ?? (await fetchStory(projectId));
+        const freshStory = story ?? (await fetchStoryOptional(projectId));
+        if (!freshStory) {
+          throw new Error("Story not found — generate a video first.");
+        }
         const renderJob = await renderEpisode(projectId, freshStory.episodes[0]?.id);
         await waitForJob(renderJob.id);
         await queryClient.invalidateQueries({ queryKey: ["render", projectId] });
@@ -289,6 +384,7 @@ export function useProjectChat({ projectId, projectName, videoSessionId, story, 
   return {
     messages,
     sendMessage,
+    stopGeneration,
     isBusy: isBusy || sendMutation.isPending,
   };
 }

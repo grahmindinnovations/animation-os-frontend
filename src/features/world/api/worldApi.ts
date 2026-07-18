@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getOptional } from "@/lib/api";
 import type { Job, World } from "@/types";
 
 export async function generateWorld(projectId: string, prompt: string): Promise<Job> {
@@ -9,4 +9,8 @@ export async function generateWorld(projectId: string, prompt: string): Promise<
 export async function fetchWorld(projectId: string): Promise<World> {
   const { data } = await api.get<World>(`/projects/${projectId}/world`);
   return data;
+}
+
+export async function fetchWorldOptional(projectId: string): Promise<World | null> {
+  return getOptional<World>(`/projects/${projectId}/world`);
 }
