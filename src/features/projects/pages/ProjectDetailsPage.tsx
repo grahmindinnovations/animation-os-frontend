@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -8,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteProject, fetchProject, updateProject } from "@/features/projects/api/projectsApi";
+import { fetchCharacter } from "@/features/character/api/characterApi";
+import { CharacterPanel } from "@/features/character/components/CharacterPanel";
+import { fetchWorld } from "@/features/world/api/worldApi";
+import { WorldPanel } from "@/features/world/components/WorldPanel";
+import { fetchStory } from "@/features/story/api/storyApi";
+import { StoryOutline } from "@/features/story/components/StoryOutline";
 import { getErrorMessage } from "@/lib/api";
 import type { Project } from "@/types";
 
@@ -21,6 +28,36 @@ export function ProjectDetailsPage() {
     queryKey: ["project", projectId],
     queryFn: () => fetchProject(projectId!),
     enabled: Boolean(projectId),
+  });
+
+  const { data: story } = useQuery({
+    queryKey: ["story", projectId],
+    queryFn: () => fetchStory(projectId!),
+    enabled: Boolean(projectId),
+    retry: (failureCount, error) => {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
+
+  const { data: character } = useQuery({
+    queryKey: ["character", projectId],
+    queryFn: () => fetchCharacter(projectId!),
+    enabled: Boolean(projectId),
+    retry: (failureCount, error) => {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
+
+  const { data: world } = useQuery({
+    queryKey: ["world", projectId],
+    queryFn: () => fetchWorld(projectId!),
+    enabled: Boolean(projectId),
+    retry: (failureCount, error) => {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
+      return failureCount < 2;
+    },
   });
 
   const [form, setForm] = useState<Pick<Project, "name" | "description" | "status"> | null>(null);
@@ -65,11 +102,31 @@ export function ProjectDetailsPage() {
 
       <div className="overflow-hidden rounded-2xl border border-[var(--color-border)]">
         <div className="studio-grid aspect-video bg-[#0a0a0c]">
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-[var(--color-muted-foreground)]">Preview · Sprint 2</p>
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+            {story ? (
+              <>
+                <p className="text-xs uppercase tracking-wider text-[var(--color-muted-foreground)]">Story preview</p>
+                <p className="text-lg font-semibold">{story.story.title}</p>
+                <p className="max-w-md text-sm text-[var(--color-muted-foreground)]">
+                  {story.episodes[0]?.scenes.length ?? 0} scenes · Episode 1
+                  {character ? ` · ${character.name}` : ""}
+                  {world ? ` · ${world.name}` : ""}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                No story yet — use Generate below to create an outline
+              </p>
+            )}
           </div>
         </div>
       </div>
+
+      <CharacterPanel projectId={projectId!} character={character} />
+
+      <WorldPanel projectId={projectId!} world={world} />
+
+      {story && <StoryOutline story={story} />}
 
       <div className="max-w-xl space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-6">
         <h1 className="text-lg font-semibold">Project settings</h1>

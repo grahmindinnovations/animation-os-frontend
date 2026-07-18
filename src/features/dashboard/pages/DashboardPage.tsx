@@ -6,6 +6,7 @@ import { Loading } from "@/components/common/Loading";
 import { ProjectCard } from "@/components/common/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { fetchDashboard } from "@/features/dashboard/api/dashboardApi";
+import { PipelineTestCard } from "@/features/jobs/components/PipelineTestCard";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -50,6 +51,8 @@ export function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <PipelineTestCard />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map(({ label, value, icon: Icon }) => (
