@@ -35,6 +35,8 @@ export function GenerationBar({ className }: GenerationBarProps) {
     if (!job || !projectId) return;
     if (job.status === "completed") {
       queryClient.invalidateQueries({ queryKey: ["story", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["memory", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["shots", projectId] });
       setActiveJobId(null);
       setPrompt("");
     }

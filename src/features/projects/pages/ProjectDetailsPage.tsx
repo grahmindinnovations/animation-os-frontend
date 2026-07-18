@@ -15,6 +15,11 @@ import { fetchWorld } from "@/features/world/api/worldApi";
 import { WorldPanel } from "@/features/world/components/WorldPanel";
 import { fetchStory } from "@/features/story/api/storyApi";
 import { StoryOutline } from "@/features/story/components/StoryOutline";
+import { ProductionPanel } from "@/features/production/components/ProductionPanel";
+import { MemoryPanel } from "@/features/memory/components/MemoryPanel";
+import { SelectiveRenderPanel } from "@/features/selective-render/components/SelectiveRenderPanel";
+import { fetchLatestRender } from "@/features/render/api/renderApi";
+import { EpisodePreview, RenderPanel } from "@/features/render/components/RenderPanel";
 import { getErrorMessage } from "@/lib/api";
 import type { Project } from "@/types";
 
@@ -53,6 +58,16 @@ export function ProjectDetailsPage() {
   const { data: world } = useQuery({
     queryKey: ["world", projectId],
     queryFn: () => fetchWorld(projectId!),
+    enabled: Boolean(projectId),
+    retry: (failureCount, error) => {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
+
+  const { data: latestRender } = useQuery({
+    queryKey: ["render", projectId, "latest"],
+    queryFn: () => fetchLatestRender(projectId!),
     enabled: Boolean(projectId),
     retry: (failureCount, error) => {
       if (axios.isAxiosError(error) && error.response?.status === 404) return false;
@@ -102,23 +117,12 @@ export function ProjectDetailsPage() {
 
       <div className="overflow-hidden rounded-2xl border border-[var(--color-border)]">
         <div className="studio-grid aspect-video bg-[#0a0a0c]">
-          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            {story ? (
-              <>
-                <p className="text-xs uppercase tracking-wider text-[var(--color-muted-foreground)]">Story preview</p>
-                <p className="text-lg font-semibold">{story.story.title}</p>
-                <p className="max-w-md text-sm text-[var(--color-muted-foreground)]">
-                  {story.episodes[0]?.scenes.length ?? 0} scenes · Episode 1
-                  {character ? ` · ${character.name}` : ""}
-                  {world ? ` · ${world.name}` : ""}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                No story yet — use Generate below to create an outline
-              </p>
-            )}
-          </div>
+          <EpisodePreview
+            story={story}
+            characterName={character?.name}
+            worldName={world?.name}
+            latestRender={latestRender}
+          />
         </div>
       </div>
 
@@ -127,6 +131,19 @@ export function ProjectDetailsPage() {
       <WorldPanel projectId={projectId!} world={world} />
 
       {story && <StoryOutline story={story} />}
+
+      {story && <MemoryPanel projectId={projectId!} story={story} />}
+
+      {character && <SelectiveRenderPanel projectId={projectId!} character={character} />}
+
+      <ProductionPanel
+        projectId={projectId!}
+        story={story}
+        hasCharacter={Boolean(character)}
+        hasWorld={Boolean(world)}
+      />
+
+      {story && <RenderPanel projectId={projectId!} story={story} />}
 
       <div className="max-w-xl space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-6">
         <h1 className="text-lg font-semibold">Project settings</h1>

@@ -119,7 +119,7 @@ export function CharacterPanel({ projectId, character }: CharacterPanelProps) {
           </div>
 
           <p className="text-xs text-[var(--color-muted-foreground)]">
-            Regenerate story below to inject this character into every scene.
+            Use Selective Render below to change clothes and regen only affected shots.
           </p>
         </div>
       )}
